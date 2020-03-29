@@ -1,0 +1,201 @@
+basePath: /
+definitions:
+  model.Error:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+  model.ToDo:
+    properties:
+      completed:
+        type: boolean
+      id:
+        type: string
+      order:
+        type: integer
+      title:
+        type: string
+      url:
+        format: uuid
+        type: string
+    required:
+    - title
+    type: object
+  model.ToDoInput:
+    properties:
+      completed:
+        type: boolean
+      order:
+        type: integer
+      title:
+        type: string
+    required:
+    - title
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: jim@anconafamily.com
+    name: Jim Ancona
+    url: https://github.com/jancona
+  description: This is a simple todo list API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: To Do List API
+  version: 0.1.0
+paths:
+  /todos:
+    delete:
+      operationId: deleteAll
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.ToDo'
+            type: array
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: deletes all ToDos
+      tags:
+      - todos
+    get:
+      operationId: find
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.ToDo'
+            type: array
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: returns all todos
+      tags:
+      - todos
+    post:
+      consumes:
+      - application/json
+      operationId: addOne
+      parameters:
+      - description: Add ToDo
+        in: body
+        name: todo
+        required: true
+        schema:
+          $ref: '#/definitions/model.ToDoInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ToDo'
+        "415":
+          description: Bad Content-Type
+          schema:
+            $ref: '#/definitions/model.Error'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: adds a new ToDo
+      tags:
+      - todos
+  /todos/{id}:
+    delete:
+      operationId: delete
+      parameters:
+      - description: ToDo ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ToDo'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: deletes a ToDo
+      tags:
+      - todos
+    get:
+      operationId: getOne
+      parameters:
+      - description: ToDo ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ToDo'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/model.Error'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: gets a ToDo
+      tags:
+      - todos
+    patch:
+      consumes:
+      - application/json
+      operationId: update
+      parameters:
+      - description: ToDo ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update ToDo
+        in: body
+        name: todo
+        required: true
+        schema:
+          $ref: '#/definitions/model.ToDoInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ToDo'
+        "415":
+          description: Bad Content-Type
+          schema:
+            $ref: '#/definitions/model.Error'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/model.Error'
+      summary: updates a ToDo
+      tags:
+      - todos
+schemes:
+- http
+- https
+swagger: "2.0"

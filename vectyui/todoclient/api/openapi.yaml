@@ -1,0 +1,230 @@
+openapi: 3.0.1
+info:
+  contact:
+    email: jim@anconafamily.com
+    name: Jim Ancona
+    url: https://github.com/jancona
+  description: This is a simple todo list API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: To Do List API
+  version: 0.1.0
+servers:
+- url: http://localhost:3000/
+- url: https://localhost:3000/
+paths:
+  /todos:
+    delete:
+      operationId: deleteAll
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                items:
+                  $ref: '#/components/schemas/model.ToDo'
+                type: array
+          description: OK
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: deletes all ToDos
+      tags:
+      - todos
+    get:
+      operationId: find
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/model.ToDo'
+                type: array
+          description: OK
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: returns all todos
+      tags:
+      - todos
+    post:
+      operationId: addOne
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/model.ToDoInput'
+        description: Add ToDo
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.ToDo'
+          description: OK
+        "415":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Bad Content-Type
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: adds a new ToDo
+      tags:
+      - todos
+      x-codegen-request-body-name: todo
+  /todos/{id}:
+    delete:
+      operationId: delete
+      parameters:
+      - description: ToDo ID
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        "204":
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/model.ToDo'
+          description: OK
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: deletes a ToDo
+      tags:
+      - todos
+    get:
+      operationId: getOne
+      parameters:
+      - description: ToDo ID
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.ToDo'
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: gets a ToDo
+      tags:
+      - todos
+    patch:
+      operationId: update
+      parameters:
+      - description: ToDo ID
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/model.ToDoInput'
+        description: Update ToDo
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.ToDo'
+          description: OK
+        "415":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Bad Content-Type
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/model.Error'
+          description: Server error
+      summary: updates a ToDo
+      tags:
+      - todos
+      x-codegen-request-body-name: todo
+components:
+  schemas:
+    model.Error:
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      type: object
+    model.ToDo:
+      example:
+        completed: true
+        id: id
+        title: title
+        url: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        order: 0
+      properties:
+        completed:
+          type: boolean
+        id:
+          type: string
+        order:
+          type: integer
+        title:
+          type: string
+        url:
+          format: uuid
+          type: string
+      required:
+      - title
+      type: object
+    model.ToDoInput:
+      properties:
+        completed:
+          type: boolean
+        order:
+          type: integer
+        title:
+          type: string
+      required:
+      - title
+      type: object
