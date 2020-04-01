@@ -1,3 +1,4 @@
+//go:generate sh -c "openapi-generator generate -g go -i ../server/docs/swagger.json -o todoclient -p packageName=todoclient && rm todoclient/go.mod todoclient/go.sum"
 package main
 
 import (

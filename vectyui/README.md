@@ -1,0 +1,1 @@
+This is a Vecty client for the ToDo backend REST server. It's based on the [example in the Vecty repo](https://github.com/gopherjs/vecty/tree/master/example/todomvc).
