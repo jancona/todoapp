@@ -2,13 +2,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/awslabs/aws-lambda-go-api-proxy/gorillamux"
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -17,7 +22,10 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-const contentType = "application/json"
+const (
+	contentType = "application/json"
+	defaultURL  = "http://localhost:3000"
+)
 
 // @title To Do List API
 // @version 0.1.0
@@ -36,12 +44,24 @@ const contentType = "application/json"
 // @produce application/json
 // @schemes http https
 func main() {
+	isLambda := true
+	if os.Getenv("LAMBDA_TASK_ROOT") == "" {
+		isLambda = false
+	}
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = defaultURL
+	}
+	url, err := url.ParseRequestURI(baseURL)
+	if err != nil {
+		log.Fatalf("Error parsing base URL '%s': %v", baseURL, err)
+	}
 	r := NewRouter(App{
 		ToDos:   make(map[uuid.UUID]model.ToDo),
-		BaseURL: "http://localhost:3000",
+		BaseURL: baseURL,
 	})
 	r.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:3000/swagger/doc.json"), //The url pointing to API definition
+		httpSwagger.URL(baseURL+"/swagger/doc.json"), //The url pointing to API definition
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 		httpSwagger.DomID("#swagger-ui"),
@@ -51,12 +71,21 @@ func main() {
 	r.PathPrefix("/wasm/").
 		Handler(http.StripPrefix("/wasm", http.FileServer(http.Dir("../vectyui/web"))))
 	r.NotFoundHandler = http.HandlerFunc(notFound)
-	log.Fatal(http.ListenAndServe(":3000",
-		handlers.LoggingHandler(os.Stdout,
-			handlers.CORS(
-				handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"}),
-				handlers.AllowedMethods([]string{"GET", "POST", "PATCH", "DELETE", "HEAD", "OPTIONS"}),
-				handlers.AllowedOrigins([]string{"*"}))(r))))
+
+	if isLambda {
+		adapter := gorillamux.New(r)
+		lambda.Start(func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+			// If no name is provided in the HTTP request body, throw an error
+			return adapter.ProxyWithContext(ctx, req)
+		})
+	} else {
+		log.Fatal(http.ListenAndServe(url.Host,
+			handlers.LoggingHandler(os.Stdout,
+				handlers.CORS(
+					handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"}),
+					handlers.AllowedMethods([]string{"GET", "POST", "PATCH", "DELETE", "HEAD", "OPTIONS"}),
+					handlers.AllowedOrigins([]string{"*"}))(r))))
+	}
 }
 
 // NewRouter builds a router for handling requests
