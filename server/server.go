@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	_ "github.com/jancona/todoapp/server/docs"
+	"github.com/jancona/todoapp/server/docs"
 	"github.com/jancona/todoapp/server/model"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -39,7 +39,7 @@ const (
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host localhost:3000
+// @host api.ourroots.org
 // @BasePath /
 // @accept application/json
 // @produce application/json
@@ -66,6 +66,7 @@ func main() {
 		ToDos:   make(map[uuid.UUID]model.ToDo),
 		BaseURL: baseURL,
 	})
+	docs.SwaggerInfo.Host = url.Hostname()
 	r.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
 		httpSwagger.URL(baseURL+"/swagger/doc.json"), //The url pointing to API definition
 		httpSwagger.DeepLinking(true),
@@ -75,6 +76,7 @@ func main() {
 	r.NotFoundHandler = http.HandlerFunc(notFound)
 
 	if isLambda {
+		docs.SwaggerInfo.Schemes = []string{"https"}
 		adapter := gorillamux.New(r)
 		lambda.Start(func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 			log.Printf("Lambda request %#v", req)

@@ -14,7 +14,7 @@ build:
 #	$(GOBUILD) ./...
 	cd vectyui && GOOS=js GOARCH=wasm $(GOBUILD) -o $(VECTY_BUILT)
 	cp `go env GOROOT`"/misc/wasm/wasm_exec.js" $(VECTY_OUT)/
-	cd server && GOOS=linux $(GOBUILD) -o $(BINARY_NAME)
+	cd server && go generate && GOOS=linux $(GOBUILD) -o $(BINARY_NAME)
 	cd flutterui && flutter build web
 package:
 	zip -r deploy/awslambda/$(BINARY_NAME).zip server/$(BINARY_NAME) 

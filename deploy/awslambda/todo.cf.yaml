@@ -153,6 +153,7 @@ Resources:
       Environment:
         Variables:
           BASE_URL: !Sub "https://${DomainName}"
+          GO_API_HOST: !Sub "https://${DomainName}"
 
   ToDoFunctionPermission:
     Type: AWS::Lambda::Permission

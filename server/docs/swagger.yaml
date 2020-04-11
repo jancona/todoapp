@@ -34,7 +34,7 @@ definitions:
     required:
     - title
     type: object
-host: localhost:3000
+host: api.ourroots.org
 info:
   contact:
     email: jim@anconafamily.com
