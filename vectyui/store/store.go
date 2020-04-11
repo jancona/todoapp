@@ -21,10 +21,15 @@ var (
 
 	// Listeners is the listeners that will be invoked when the store changes.
 	Listeners = storeutil.NewListenerRegistry()
+
+	clientConf = todoclient.NewConfiguration()
 )
 
 func init() {
 	dispatcher.Register(onAction)
+	clientConf.Host = ""
+	clientConf.Scheme = ""
+	clientConf.BasePath = ".."
 }
 
 // ActiveItemCount returns the current number of items that are not completed.
@@ -130,7 +135,7 @@ func onAction(action interface{}) {
 }
 
 func getAll() ([]*todoclient.ModelToDo, error) {
-	c := todoclient.NewAPIClient(todoclient.NewConfiguration())
+	c := todoclient.NewAPIClient(clientConf)
 	todos, r, err := c.TodosApi.Find(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("Unable to get Todos: %v", err)
@@ -148,7 +153,7 @@ func getAll() ([]*todoclient.ModelToDo, error) {
 }
 
 func addToDo(tdi todoclient.ModelToDoInput) (*todoclient.ModelToDo, error) {
-	c := todoclient.NewAPIClient(todoclient.NewConfiguration())
+	c := todoclient.NewAPIClient(clientConf)
 	todo, r, err := c.TodosApi.AddOne(context.TODO(), tdi)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to add %#v: %v", tdi, err)
@@ -160,7 +165,7 @@ func addToDo(tdi todoclient.ModelToDoInput) (*todoclient.ModelToDo, error) {
 }
 
 func deleteToDo(todo todoclient.ModelToDo) error {
-	c := todoclient.NewAPIClient(todoclient.NewConfiguration())
+	c := todoclient.NewAPIClient(clientConf)
 	_, r, err := c.TodosApi.Delete(context.TODO(), todo.Id)
 	if err != nil {
 		return fmt.Errorf("Unable to delete %s: %v", todo.Id, err)
@@ -172,7 +177,7 @@ func deleteToDo(todo todoclient.ModelToDo) error {
 }
 
 func updateToDo(todo todoclient.ModelToDo) (*todoclient.ModelToDo, error) {
-	c := todoclient.NewAPIClient(todoclient.NewConfiguration())
+	c := todoclient.NewAPIClient(clientConf)
 	todo, r, err := c.TodosApi.Update(
 		context.TODO(),
 		todo.Id,

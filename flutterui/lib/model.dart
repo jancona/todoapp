@@ -19,7 +19,7 @@ class ToDoModel extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   FilterType filter = FilterType.All;
 
-  final _apiInstance = TodosApi(ApiClient(basePath: "http://localhost:3000"));
+  final _apiInstance = TodosApi(ApiClient(basePath: ".."));
 
   ToDoModel() { 
     load();

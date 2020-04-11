@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -44,18 +45,23 @@ const (
 // @produce application/json
 // @schemes http https
 func main() {
+	log.Printf("Starting %s", os.Args[0])
+	dir := path.Dir(os.Args[0])
 	isLambda := true
 	if os.Getenv("LAMBDA_TASK_ROOT") == "" {
 		isLambda = false
 	}
+	log.Printf("isLambda %v", isLambda)
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = defaultURL
 	}
+	log.Printf("BaseURL: %s", baseURL)
 	url, err := url.ParseRequestURI(baseURL)
 	if err != nil {
 		log.Fatalf("Error parsing base URL '%s': %v", baseURL, err)
 	}
+	log.Printf("BaseURL: %s, url: %s", baseURL, url)
 	r := NewRouter(App{
 		ToDos:   make(map[uuid.UUID]model.ToDo),
 		BaseURL: baseURL,
@@ -66,19 +72,24 @@ func main() {
 		httpSwagger.DocExpansion("none"),
 		httpSwagger.DomID("#swagger-ui"),
 	))
-	r.PathPrefix("/flutter/").
-		Handler(http.StripPrefix("/flutter", http.FileServer(http.Dir("../flutterui/build/web"))))
-	r.PathPrefix("/wasm/").
-		Handler(http.StripPrefix("/wasm", http.FileServer(http.Dir("../vectyui/web"))))
 	r.NotFoundHandler = http.HandlerFunc(notFound)
 
 	if isLambda {
 		adapter := gorillamux.New(r)
 		lambda.Start(func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+			log.Printf("Lambda request %#v", req)
 			// If no name is provided in the HTTP request body, throw an error
 			return adapter.ProxyWithContext(ctx, req)
 		})
+		log.Fatal("Lambda exiting...")
 	} else {
+		flutterDir := dir + "/../flutterui/build/web"
+		vectyDir := dir + "/../vectyui/build/web"
+		log.Printf("flutterDir: %s, vectyDir: %s", flutterDir, vectyDir)
+		r.PathPrefix("/flutter/").
+			Handler(http.StripPrefix("/flutter", http.FileServer(http.Dir(flutterDir))))
+		r.PathPrefix("/wasm/").
+			Handler(http.StripPrefix("/wasm", http.FileServer(http.Dir(vectyDir))))
 		log.Fatal(http.ListenAndServe(url.Host,
 			handlers.LoggingHandler(os.Stdout,
 				handlers.CORS(

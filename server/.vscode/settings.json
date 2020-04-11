@@ -5,5 +5,11 @@
   "spellright.documentTypes": [
     "latex",
     "plaintext"
-  ]
+  ],
+  "files.exclude": {
+    "**/.classpath": true,
+    "**/.project": true,
+    "**/.settings": true,
+    "**/.factorypath": true
+  }
 }

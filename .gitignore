@@ -15,3 +15,7 @@
 # vendor/
 
 .DS_Store
+main.lambda.zip
+main.lambda
+server/server
+output-todo.cf.yaml

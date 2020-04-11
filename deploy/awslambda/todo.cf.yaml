@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ToDo App Sample
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  DomainName:
+    Type: String
+    Description: FQDN the app will be hosted at
+    # This assumes that the DNS for this domain is configured elsewhere
+    # TODO: Allow for various delegation and Route 53 scenarios
+  CertificateArn:
+    Type: String
+    Description: ARN of the Certificate Manager cert to use for the domain
+    # TODO: Optionally create the certificate
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-site"
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    # DeletionPolicy: Retain
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Id: SiteBucketPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: ReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*' 
+            # Principal: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ToDoApi}/*/*"
+            Action: 
+              - 's3:GetObject'
+            Resource: !Join [ '', [ Fn::GetAtt: [ SiteBucket , Arn ] , '/*' ] ]
+
+  ToDoApi:
+    Type: "AWS::ApiGatewayV2::Api"
+    Properties:
+      Name: !Ref AWS::StackName
+      ProtocolType: HTTP
+      Version: "0.1"
+
+  ApiStage:
+    Type: "AWS::ApiGatewayV2::Stage"
+    Properties:
+      StageName: "$default"
+      AutoDeploy: true
+      ApiId: !Ref ToDoApi
+      AccessLogSettings:
+        DestinationArn:
+          Fn::GetAtt: [ ApiLogGroup , Arn ]
+        Format: '$context.identity.sourceIp - - [$context.requestTime] "$context.httpMethod $context.path $context.protocol" $context.status $context.responseLength - "$context.identity.userAgent" $context.requestId'
+      # DefaultRouteSettings:
+      #   DetailedMetricsEnabled: true
+      #   ThrottlingBurstLimit: 10
+      #   ThrottlingRateLimit: 10
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}/API-Gateway/access-logs"
+      RetentionInDays: 7
+
+  ApiRoute:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref ToDoApi
+      RouteKey: "$default"
+      AuthorizationType: NONE
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APIIntegration
+
+  WasmRoute:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref ToDoApi
+      RouteKey: "GET /wasm/{proxy+}"
+      AuthorizationType: NONE
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref WasmIntegration
+
+  FlutterRoute:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref ToDoApi
+      RouteKey: "GET /flutter/{proxy+}"
+      AuthorizationType: NONE
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref FlutterIntegration
+
+  WasmIntegration:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref ToDoApi
+      Description: WASM Site Bucket Integration
+      IntegrationType: HTTP_PROXY
+      IntegrationUri: !Join [ '/', [ Fn::GetAtt: [ SiteBucket , WebsiteURL ] , 'wasm/{proxy}' ] ]
+      IntegrationMethod: GET
+      PayloadFormatVersion: "1.0"
+
+  FlutterIntegration:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref ToDoApi
+      Description: Flutter Site Bucket Integration
+      IntegrationType: HTTP_PROXY
+      IntegrationUri: !Join [ '/', [ Fn::GetAtt: [ SiteBucket , WebsiteURL ] , 'flutter/{proxy}' ] ]
+      IntegrationMethod: GET
+      PayloadFormatVersion: "1.0"
+
+  APIIntegration:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref ToDoApi
+      Description: Lambda Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ToDoFunction.Arn}/invocations"
+      PayloadFormatVersion: "1.0"
+
+  ToDoDomainName:
+    Type: "AWS::ApiGatewayV2::DomainName"
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameConfigurations:
+        - EndpointType: REGIONAL
+          CertificateArn: !Ref CertificateArn
+
+  ToDoApiMapping:
+    Type: "AWS::ApiGatewayV2::ApiMapping"
+    Properties:
+      DomainName: !Ref ToDoDomainName
+      ApiId: !Ref ToDoApi
+      Stage: !Ref ApiStage
+
+  ToDoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: server/main.lambda
+      CodeUri: main.lambda.zip
+      Runtime: go1.x
+      MemorySize: 128
+      Policies: AWSLambdaBasicExecutionRole
+      Timeout: 3
+      Environment:
+        Variables:
+          BASE_URL: !Sub "https://${DomainName}"
+
+  ToDoFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref ToDoFunction
+      Principal: 'apigateway.amazonaws.com'
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ToDoApi}/*/*"
