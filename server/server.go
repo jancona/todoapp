@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -26,6 +25,15 @@ import (
 const (
 	contentType = "application/json"
 	defaultURL  = "http://localhost:3000"
+	indexHTML   = `<html>
+	<body>
+		<a href='/flutter/'>Flutter UI</a><br/>
+		<a href='/wasm/'>Vecty WASM UI</a><br/>
+		<a href='/swagger/'>Swagger API Documentation</a><br/>
+		<a href='/todos'>API</a><br/>
+	</body>
+</html>
+`
 )
 
 // @title To Do List API
@@ -45,8 +53,6 @@ const (
 // @produce application/json
 // @schemes http https
 func main() {
-	log.Printf("Starting %s", os.Args[0])
-	dir := path.Dir(os.Args[0])
 	isLambda := true
 	if os.Getenv("LAMBDA_TASK_ROOT") == "" {
 		isLambda = false
@@ -85,8 +91,8 @@ func main() {
 		})
 		log.Fatal("Lambda exiting...")
 	} else {
-		flutterDir := dir + "/../flutterui/build/web"
-		vectyDir := dir + "/../vectyui/build/web"
+		flutterDir := "../flutterui/build/web"
+		vectyDir := "../vectyui/build/web"
 		log.Printf("flutterDir: %s, vectyDir: %s", flutterDir, vectyDir)
 		r.PathPrefix("/flutter/").
 			Handler(http.StripPrefix("/flutter", http.FileServer(http.Dir(flutterDir))))
@@ -104,6 +110,8 @@ func main() {
 // NewRouter builds a router for handling requests
 func NewRouter(app App) *mux.Router {
 	r := mux.NewRouter()
+	r.HandleFunc("/", app.GetIndex).Methods("GET")
+	r.HandleFunc("/index.html", app.GetIndex).Methods("GET")
 	r.HandleFunc("/todos", app.GetAllToDos).Methods("GET")
 	r.HandleFunc("/todos", app.PostToDo).Methods("POST")
 	r.HandleFunc("/todos", app.DeleteAllToDos).Methods("DELETE")
@@ -117,6 +125,12 @@ func NewRouter(app App) *mux.Router {
 type App struct {
 	BaseURL string
 	ToDos   map[uuid.UUID]model.ToDo
+}
+
+// GetIndex returns an HTML index page
+func (app App) GetIndex(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(indexHTML))
 }
 
 // GetAllToDos returns all todos in the database
