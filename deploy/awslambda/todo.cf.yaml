@@ -13,6 +13,7 @@ Parameters:
     # TODO: Optionally create the certificate
 Resources:
   SiteBucket:
+    # Bucket to hold static site assets
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "${AWS::StackName}-site"
@@ -21,6 +22,7 @@ Resources:
         IndexDocument: index.html
     # DeletionPolicy: Retain
   SiteBucketPolicy:
+    # Allow reads from the bucket
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref SiteBucket
@@ -31,7 +33,6 @@ Resources:
           - Sid: ReadForGetBucketObjects
             Effect: Allow
             Principal: '*' 
-            # Principal: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ToDoApi}/*/*"
             Action: 
               - 's3:GetObject'
             Resource: !Join [ '', [ Fn::GetAtt: [ SiteBucket , Arn ] , '/*' ] ]
@@ -52,7 +53,7 @@ Resources:
       AccessLogSettings:
         DestinationArn:
           Fn::GetAtt: [ ApiLogGroup , Arn ]
-        Format: '$context.identity.sourceIp - - [$context.requestTime] "$context.httpMethod $context.path $context.protocol" $context.status $context.responseLength - "$context.identity.userAgent" $context.requestId'
+        Format: '$context.identity.sourceIp - - [$context.requestTime] "$context.httpMethod $context.path $context.protocol" $context.status $context.responseLength - "$context.identity.userAgent" $context.requestId' # Common Log Format plus a couple extra fields
       # DefaultRouteSettings:
       #   DetailedMetricsEnabled: true
       #   ThrottlingBurstLimit: 10
@@ -64,6 +65,7 @@ Resources:
       LogGroupName: !Sub "${AWS::StackName}/API-Gateway/access-logs"
       RetentionInDays: 7
 
+  # By default, requests go the the API Lambda, unless overridden below
   ApiRoute:
     Type: "AWS::ApiGatewayV2::Route"
     Properties:
@@ -75,6 +77,16 @@ Resources:
         - - integrations
           - !Ref APIIntegration
 
+  APIIntegration:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref ToDoApi
+      Description: Lambda Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ToDoFunction.Arn}/invocations"
+      PayloadFormatVersion: "1.0"
+
+  # GETs to /wasm/* go to the /wasm/ bucket path
   WasmRoute:
     Type: "AWS::ApiGatewayV2::Route"
     Properties:
@@ -86,6 +98,17 @@ Resources:
         - - integrations
           - !Ref WasmIntegration
 
+  WasmIntegration:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref ToDoApi
+      Description: WASM Site Bucket Integration
+      IntegrationType: HTTP_PROXY
+      IntegrationUri: !Join [ '/', [ Fn::GetAtt: [ SiteBucket , WebsiteURL ] , 'wasm/{proxy}' ] ]
+      IntegrationMethod: GET
+      PayloadFormatVersion: "1.0"
+
+  # GETs to /flutter/* go to the /flutter/ bucket path
   FlutterRoute:
     Type: "AWS::ApiGatewayV2::Route"
     Properties:
@@ -97,16 +120,6 @@ Resources:
         - - integrations
           - !Ref FlutterIntegration
 
-  WasmIntegration:
-    Type: "AWS::ApiGatewayV2::Integration"
-    Properties:
-      ApiId: !Ref ToDoApi
-      Description: WASM Site Bucket Integration
-      IntegrationType: HTTP_PROXY
-      IntegrationUri: !Join [ '/', [ Fn::GetAtt: [ SiteBucket , WebsiteURL ] , 'wasm/{proxy}' ] ]
-      IntegrationMethod: GET
-      PayloadFormatVersion: "1.0"
-
   FlutterIntegration:
     Type: "AWS::ApiGatewayV2::Integration"
     Properties:
@@ -117,15 +130,7 @@ Resources:
       IntegrationMethod: GET
       PayloadFormatVersion: "1.0"
 
-  APIIntegration:
-    Type: "AWS::ApiGatewayV2::Integration"
-    Properties:
-      ApiId: !Ref ToDoApi
-      Description: Lambda Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ToDoFunction.Arn}/invocations"
-      PayloadFormatVersion: "1.0"
-
+  # Map the domain name passed as a parameter to the API Gateway API
   ToDoDomainName:
     Type: "AWS::ApiGatewayV2::DomainName"
     Properties:
@@ -141,6 +146,7 @@ Resources:
       ApiId: !Ref ToDoApi
       Stage: !Ref ApiStage
 
+  # Define the Lambda function
   ToDoFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -152,9 +158,12 @@ Resources:
       Timeout: 3
       Environment:
         Variables:
+          # This variable tells our server code what domain name is in use
           BASE_URL: !Sub "https://${DomainName}"
+          # This variable tells Swag what domain name is in use
           GO_API_HOST: !Sub "https://${DomainName}"
 
+  # Give the API permission to call the Lambda
   ToDoFunctionPermission:
     Type: AWS::Lambda::Permission
     Properties:

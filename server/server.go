@@ -53,11 +53,12 @@ const (
 // @produce application/json
 // @schemes http https
 func main() {
+	// Find out if we're running in a Lambda function
 	isLambda := true
 	if os.Getenv("LAMBDA_TASK_ROOT") == "" {
 		isLambda = false
 	}
-	log.Printf("isLambda %v", isLambda)
+	// baseURL is used to build proper absolute URLs in a couple of places
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = defaultURL
@@ -82,6 +83,10 @@ func main() {
 	r.NotFoundHandler = http.HandlerFunc(notFound)
 
 	if isLambda {
+		// Lambda-specific setup
+		// Note that the Lamda doesn't serve static content, only the API
+		// API Gateway proxies static content requests directly to an S3 bucket
+		// API Gateway + Lambda is https-only
 		docs.SwaggerInfo.Schemes = []string{"https"}
 		adapter := gorillamux.New(r)
 		lambda.Start(func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -91,6 +96,9 @@ func main() {
 		})
 		log.Fatal("Lambda exiting...")
 	} else {
+		// If we're not running in Lambda we also serve the static content.
+		// This is useful in development. It might also be in a traditional server deploy, but requirements
+		// for all of this are TBD.
 		flutterDir := "../flutterui/build/web"
 		vectyDir := "../vectyui/build/web"
 		log.Printf("flutterDir: %s, vectyDir: %s", flutterDir, vectyDir)
@@ -124,7 +132,10 @@ func NewRouter(app App) *mux.Router {
 // App is the container for the application
 type App struct {
 	BaseURL string
-	ToDos   map[uuid.UUID]model.ToDo
+	// Dummy "database".
+	// (Note that this behaves really strangely when multiple Lambda are running
+	// because which database you see depends on which Lamda instance you're routed to.)
+	ToDos map[uuid.UUID]model.ToDo
 }
 
 // GetIndex returns an HTML index page
